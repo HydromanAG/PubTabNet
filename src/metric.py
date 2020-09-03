@@ -52,9 +52,33 @@ class CustomConfig(Config):
     def rename(self, node1, node2):
         """Compares attributes of trees"""
         if (node1.tag != node2.tag) or (node1.colspan != node2.colspan) or (node1.rowspan != node2.rowspan):
+#             print("hello"
             return 1.
-        if node1.tag == 'td':
-            if node1.content or node2.content:
+#         if node1.tag == 'td':
+#             if node1.content or node2.content:
+#                 return self.normalized_distance(node1.content, node2.content)
+        return 0.
+
+class CustomTextConfig(Config):
+    @staticmethod
+    def maximum(*sequences):
+        """Get maximum possible value
+        """
+        return max(map(len, sequences))
+
+    def normalized_distance(self, *sequences):
+        """Get distance from 0 to 1
+        """
+        return float(distance.levenshtein(*sequences)) / self.maximum(*sequences)
+
+    def rename(self, node1, node2):
+        """Compares attributes of trees"""
+#         if (node1.tag != node2.tag) or (node1.colspan != node2.colspan) or (node1.rowspan != node2.rowspan):
+# #             print("hello"
+#             return 1.
+        if node1.tag == 'td' and node2.tag == 'td':
+            if node1.content and node2.content:
+                print(node1.content)
                 return self.normalized_distance(node1.content, node2.content)
         return 0.
 
@@ -107,8 +131,8 @@ class TEDS(object):
         if parent is None:
             return new_node
 
-    def evaluate(self, pred, true):
-        ''' Computes TEDS score between the prediction and the ground truth of a
+    def structevaluate(self, pred, true):
+        ''' Computes TEDS(structure similarity) score between the prediction and the ground truth of a
             given sample
         '''
         if (not pred) or (not true):
@@ -128,6 +152,30 @@ class TEDS(object):
             tree_pred = self.load_html_tree(pred)
             tree_true = self.load_html_tree(true)
             distance = APTED(tree_pred, tree_true, CustomConfig()).compute_edit_distance()
+            return 1.0 - (float(distance) / n_nodes)
+        else:
+            return 0.0
+    def textevaluate(self,pred, true):
+        ''' Computes TEDS(content similarity) score between the prediction and the ground truth of a
+            given sample
+        '''
+        if (not pred) or (not true):
+            return 0.0
+        parser = html.HTMLParser(remove_comments=True, encoding='utf-8')
+        pred = html.fromstring(pred, parser=parser)
+        true = html.fromstring(true, parser=parser)
+        if pred.xpath('body/table') and true.xpath('body/table'):
+            pred = pred.xpath('body/table')[0]
+            true = true.xpath('body/table')[0]
+            if self.ignore_nodes:
+                etree.strip_tags(pred, *self.ignore_nodes)
+                etree.strip_tags(true, *self.ignore_nodes)
+            n_nodes_pred = len(pred.xpath(".//*"))
+            n_nodes_true = len(true.xpath(".//*"))
+            n_nodes = max(n_nodes_pred, n_nodes_true)
+            tree_pred = self.load_html_tree(pred)
+            tree_true = self.load_html_tree(true)
+            distance = APTED(tree_pred, tree_true, CustomTextConfig()).compute_edit_distance()
             return 1.0 - (float(distance) / n_nodes)
         else:
             return 0.0
